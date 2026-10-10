@@ -1,0 +1,205 @@
+# Release: a pushed tag vX.Y.Z builds, tests and publishes the packages as a GitHub release.
+# Dry run: Actions > Release > Run workflow (or `gh workflow run release.yml --ref <branch>
+# -f version=0.1.0-test`) does everything but publishing and uploads the files as an artifact.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version for the dry run (e.g. 0.1.0-test); nothing is released"
+        required: true
+        default: "0.0.0-dev"
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NFPM_VERSION: "2.47.0"
+  NFPM_SHA256: "0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783" # nfpm_2.47.0_Linux_x86_64.tar.gz
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: v
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          src=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' mothership/__init__.py)
+          if [ "$EVENT" = push ]; then
+            v=${REF_NAME#v}
+            if [ "$v" != "$src" ]; then
+              echo "::error::tag $REF_NAME doesn't match mothership/__init__.py (__version__ = $src)"
+              exit 1
+            fi
+          else
+            v=$INPUT_VERSION
+          fi
+          if ! printf '%s\n' "$v" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+([-+~.][0-9A-Za-z.+~-]*)?'; then
+            echo "::error::bad version '$v'"
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "version $v (source $src)"
+
+  test:
+    name: unit tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python3 -m unittest -q
+
+  packages:
+    name: deb and rpm packages
+    needs: [version, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install nFPM
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/nfpm.tar.gz" \
+            "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          echo "$NFPM_SHA256  $RUNNER_TEMP/nfpm.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/nfpm.tar.gz" -C "$RUNNER_TEMP" nfpm
+          "$RUNNER_TEMP/nfpm" --version
+      - name: Build
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: NFPM="$RUNNER_TEMP/nfpm" packaging/nfpm/build.sh "$VERSION" dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packages-nfpm
+          path: dist/
+          if-no-files-found: error
+
+  arch:
+    name: Arch packages
+    needs: [test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container: archlinux:base-devel
+    steps:
+      - name: Install git (checkout and makepkg need a real repository)
+        run: pacman -Syu --noconfirm --needed git
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: makepkg
+        run: packaging/ci/arch-build.sh "$GITHUB_WORKSPACE" "$GITHUB_SHA" "$GITHUB_WORKSPACE/dist"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packages-arch
+          path: dist/
+          if-no-files-found: error
+
+  install-test:
+    name: install on ${{ matrix.image }}
+    needs: [packages, arch]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { kind: deb, image: "ubuntu:24.04", artifact: packages-nfpm, dkms_build: "0" }
+          - { kind: rpm, image: "fedora:latest", artifact: packages-nfpm, dkms_build: "1" }
+          - { kind: arch, image: "archlinux:base-devel", artifact: packages-arch, dkms_build: "1" }
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ matrix.artifact }}
+          path: pkgs
+      - name: Install, check, remove
+        env:
+          MOTHERSHIP_TEST_DKMS_BUILD: ${{ matrix.dkms_build }}
+        run: sh packaging/ci/install-test.sh ${{ matrix.kind }} pkgs
+
+  dry-run:
+    name: dry run (artifacts, no release)
+    if: github.event_name == 'workflow_dispatch'
+    needs: [version, install-test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: packages-*
+          path: pkgs
+          merge-multiple: true
+      - env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: packaging/ci/release-assets.sh "$VERSION" "$GITHUB_REPOSITORY" pkgs release/files release/release-notes.md
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ needs.version.outputs.version }}
+          path: release/
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [version, install-test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: packages-*
+          path: pkgs
+          merge-multiple: true
+      - env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: packaging/ci/release-assets.sh "$VERSION" "$GITHUB_REPOSITORY" pkgs release/files release/release-notes.md
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: mothership ${{ needs.version.outputs.version }}
+          body_path: release/release-notes.md
+          files: release/files/*
+          prerelease: ${{ contains(needs.version.outputs.version, '-') }}
+          fail_on_unmatched_files: true
