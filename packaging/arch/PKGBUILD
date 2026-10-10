@@ -1,7 +1,7 @@
 # Maintainer: Greg Gage <zedle@zedle.com>
 pkgbase=mothership
 pkgname=(mothership mothership-dkms)
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="Lighting, thermal and firmware control for Alienware laptops (replaces Alienware Command Center)"
 arch=('any')
