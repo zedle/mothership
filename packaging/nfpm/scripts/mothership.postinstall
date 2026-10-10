@@ -1,0 +1,41 @@
+#!/bin/sh
+# mothership: after install or upgrade.
+# deb: configure [old-version]; rpm: 1 = first install, 2+ = upgrade.
+first=0
+case "${1:-}" in
+  configure) [ -n "${2:-}" ] || first=1 ;;
+  1) first=1 ;;
+esac
+
+# The "mothership" group (udev rules, /run/mothership).
+if command -v systemd-sysusers >/dev/null 2>&1; then
+  systemd-sysusers mothership.conf || true
+elif ! getent group mothership >/dev/null 2>&1; then
+  groupadd -r mothership || true
+fi
+if command -v systemd-tmpfiles >/dev/null 2>&1; then
+  systemd-tmpfiles --create mothership.conf || true
+fi
+if command -v udevadm >/dev/null 2>&1; then
+  { udevadm control --reload && udevadm trigger --subsystem-match=hidraw --subsystem-match=hwmon \
+      --subsystem-match=platform-profile --subsystem-match=powercap; } >/dev/null 2>&1 || true
+fi
+if [ -d /run/systemd/system ]; then
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  [ "$first" = 1 ] || systemctl try-restart mothership-fire.service >/dev/null 2>&1 || true
+fi
+
+# Byte-compile for this machine's Python (the package ships sources only).
+python3 -I -m compileall -q /usr/lib/mothership/python >/dev/null 2>&1 || true
+
+if [ "$first" = 1 ]; then
+  cat <<'MSG'
+==> mothership: devices are reached through the "mothership" group.
+    Add yourself and log in again:   sudo usermod -aG mothership "$USER"
+    Start the daemon (as the user):  systemctl --user enable --now mothershipd
+    Fire effect with key flares:     sudo systemctl enable --now mothership-fire
+MSG
+else
+  echo "==> mothership: restart the daemon: systemctl --user restart mothershipd"
+fi
+exit 0

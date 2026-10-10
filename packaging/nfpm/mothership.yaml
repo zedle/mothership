@@ -1,0 +1,79 @@
+# nFPM config for the mothership .deb and .rpm. packaging/nfpm/build.sh stages the files with
+# `make install LAYOUT=private` into build/nfpm/mothership, renders the scripts into
+# build/nfpm/scripts and substitutes ${MOTHERSHIP_VERSION}; paths are relative to the repository root.
+name: mothership
+arch: all
+platform: linux
+version: ${MOTHERSHIP_VERSION}
+version_schema: semver
+release: 1
+section: utils
+priority: optional
+maintainer: Greg Gage <zedle@zedle.com>
+vendor: mothership
+homepage: https://github.com/zedle/mothership
+license: MIT
+description: |-
+  Lighting, thermal and firmware control for Alienware laptops
+  Keyboard and chassis lighting, thermal modes and fans, G-Mode, macro keys,
+  per-app profiles and lighting-controller firmware updates, as a user daemon
+  (mothershipd), a command line and a terminal UI. Not affiliated with Dell.
+
+contents:
+  - src: build/nfpm/mothership/usr/bin/mothership
+    dst: /usr/bin/mothership
+  - src: build/nfpm/mothership/usr/lib/mothership
+    dst: /usr/lib/mothership
+    type: tree
+  - src: build/nfpm/mothership/usr/lib/udev/rules.d/70-mothership.rules
+    dst: /usr/lib/udev/rules.d/70-mothership.rules
+  - src: build/nfpm/mothership/usr/lib/sysusers.d/mothership.conf
+    dst: /usr/lib/sysusers.d/mothership.conf
+  - src: build/nfpm/mothership/usr/lib/tmpfiles.d/mothership.conf
+    dst: /usr/lib/tmpfiles.d/mothership.conf
+  - src: build/nfpm/mothership/usr/lib/systemd/user/mothershipd.service
+    dst: /usr/lib/systemd/user/mothershipd.service
+  - src: build/nfpm/mothership/usr/lib/systemd/system/mothership-fire.service
+    dst: /usr/lib/systemd/system/mothership-fire.service
+  - src: build/nfpm/mothership/usr/share/mothership
+    dst: /usr/share/mothership
+    type: tree
+  - src: README.md
+    dst: /usr/share/doc/mothership/README.md
+  - src: NOTICE
+    dst: /usr/share/doc/mothership/NOTICE
+  - src: LICENSE
+    dst: /usr/share/doc/mothership/copyright
+    packager: deb
+  - src: LICENSE
+    dst: /usr/share/licenses/mothership/LICENSE
+    type: license
+    packager: rpm
+  # rpm owns no directory it isn't told about, so name ours (dpkg removes empty ones itself).
+  - dst: /usr/share/doc/mothership
+    type: dir
+    packager: rpm
+  - dst: /usr/share/licenses/mothership
+    type: dir
+    packager: rpm
+
+scripts:
+  postinstall: build/nfpm/scripts/mothership.postinstall
+  preremove: build/nfpm/scripts/mothership.preremove
+
+overrides:
+  deb:
+    depends:
+      - python3 (>= 3.11)
+    recommends:
+      - dfu-util
+      - pulseaudio-utils
+    suggests:
+      - mothership-dkms
+  rpm:
+    depends:
+      - python3 >= 3.11
+    recommends:
+      - dfu-util
+      - pulseaudio-utils
+      - mothership-dkms

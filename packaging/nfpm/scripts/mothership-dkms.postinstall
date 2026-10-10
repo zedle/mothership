@@ -1,0 +1,41 @@
+#!/bin/sh
+# mothership-dkms: register the module with DKMS and build it for every kernel with headers.
+# deb: configure [old-version]; rpm: 1 = first install, 2+ = upgrade.
+mod=alienware-wmi-mothership
+ver=@VERSION@
+case "${1:-}" in
+  abort-*) exit 0 ;;
+esac
+if ! command -v dkms >/dev/null 2>&1; then
+  echo "==> mothership-dkms: dkms is not installed; nothing registered" >&2
+  exit 0
+fi
+
+# Other versions still registered (an rpm upgrade removes the old package after this runs).
+for old in $(dkms status -m "$mod" 2>/dev/null | sed -n "s|^$mod/\([^,:]*\).*|\1|p" | sort -u); do
+  [ "$old" = "$ver" ] || dkms remove -m "$mod" -v "$old" --all >/dev/null 2>&1 || true
+done
+
+if [ -z "$(dkms status -m "$mod" -v "$ver" 2>/dev/null)" ]; then
+  dkms add -m "$mod" -v "$ver" || { echo "==> mothership-dkms: dkms add failed" >&2; exit 0; }
+fi
+
+built=0
+for dir in /lib/modules/*/; do
+  k=$(basename "$dir")
+  [ -e "$dir/build/Makefile" ] || continue
+  if dkms status -m "$mod" -v "$ver" -k "$k" 2>/dev/null | grep -q ': installed'; then
+    built=1
+  elif dkms install -m "$mod" -v "$ver" -k "$k"; then
+    built=1
+  else
+    echo "==> mothership-dkms: the build failed for kernel $k (see /var/lib/dkms/$mod/$ver/build/make.log)" >&2
+  fi
+done
+if [ "$built" = 1 ]; then
+  echo "==> mothership-dkms: installed. Load it with a reboot, or: sudo modprobe -r alienware-wmi && sudo modprobe alienware-wmi"
+else
+  echo "==> mothership-dkms: no kernel headers found. Install your kernel's headers"
+  echo "    (Debian/Ubuntu: linux-headers-\$(uname -r); Fedora: kernel-devel), then: sudo dkms autoinstall"
+fi
+exit 0

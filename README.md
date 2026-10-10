@@ -30,18 +30,57 @@ touchpad) are only named for models someone has mapped. Run `mothership probe`: 
 at a time and asks what lit up, saves the map for your machine, and prints it so you can contribute
 it in an issue or pull request.
 
-## Install (Arch Linux)
+## Install
+
+Packages for each release are on the [Releases page](https://github.com/zedle/mothership/releases):
+`mothership` (the app) and, optionally, `mothership-dkms` (the extended kernel module, see below). The
+release notes have the exact download commands for each version.
+
+**Debian 12+ / Ubuntu 24.04+**: download `mothership_<version>_all.deb` (and
+`mothership-dkms_<version>_all.deb`), then
+
+```sh
+sudo apt install ./mothership_*_all.deb ./mothership-dkms_*_all.deb
+```
+
+**Fedora / openSUSE Tumbleweed**: download `mothership-<version>-1.noarch.rpm` (and
+`mothership-dkms-<version>-1.noarch.rpm`), then
+
+```sh
+sudo dnf install ./mothership-*.noarch.rpm                             # Fedora
+sudo zypper install --allow-unsigned-rpm ./mothership-*.noarch.rpm     # openSUSE
+```
+
+**Arch Linux**: the AUR package `mothership` once it is published; until then the release's
+`.pkg.tar.zst` files (`sudo pacman -U ...`) or build from the PKGBUILD:
 
 ```sh
 git clone https://github.com/zedle/mothership && cd mothership/packaging/arch
 makepkg -si                      # builds mothership and mothership-dkms
-sudo usermod -aG mothership "$USER"   # then log out and in
-systemctl --user enable --now mothershipd
-sudo systemctl enable --now mothership-fire   # only needed for the Fire effect
 ```
 
-Other distributions: `sudo make install`, then the same group and service steps. The kernel
-module in `kernel/` is optional (see below) and installs with DKMS.
+**Other distributions**: Python 3.11 or newer, then from a checkout
+
+```sh
+sudo make install                # or: sudo make install LAYOUT=private (version-independent path)
+sudo systemd-sysusers mothership.conf && sudo systemd-tmpfiles --create mothership.conf
+sudo udevadm control --reload && sudo udevadm trigger
+```
+
+and, for the kernel module, `sudo make install-dkms` (the DKMS source tree in
+`/usr/src/alienware-wmi-mothership-<version>`) and `sudo dkms install alienware-wmi-mothership/<version>`.
+
+The kernel module needs your kernel's headers (`linux-headers-$(uname -r)`, `kernel-devel`,
+`kernel-default-devel` or `linux-headers`).
+
+### After installing
+
+```sh
+sudo usermod -aG mothership "$USER"            # then log out and in again
+systemctl --user enable --now mothershipd
+sudo systemctl enable --now mothership-fire    # only needed for the Fire effect
+mothership status
+```
 
 ## Use
 

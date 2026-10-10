@@ -1,0 +1,12 @@
+#!/bin/sh
+# mothership-dkms: unregister the module before its sources go.
+# deb: remove | upgrade <new> | deconfigure | failed-upgrade; rpm: 0 = erase, 1 = upgrade.
+mod=alienware-wmi-mothership
+ver=@VERSION@
+case "${1:-}" in
+  1) exit 0 ;;  # rpm upgrade or reinstall: the new package's postinstall has already dealt with it
+esac
+if command -v dkms >/dev/null 2>&1; then
+  dkms remove -m "$mod" -v "$ver" --all >/dev/null 2>&1 || true
+fi
+exit 0
