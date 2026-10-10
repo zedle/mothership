@@ -16,5 +16,13 @@ archver=${1##*/mothership-}; archver=${archver%-any.pkg.tar.zst}
 [ -f "$out/mothership-dkms-$archver-any.pkg.tar.zst" ] || { echo "release-assets: missing mothership-dkms-$archver-any.pkg.tar.zst" >&2; exit 1; }
 [ "$(ls "$out" | wc -l)" = 6 ] || { echo "release-assets: expected 6 packages in $out" >&2; ls -l "$out" >&2; exit 1; }
 (cd "$out" && sha256sum -- * > SHA256SUMS)
-sed -e "s|@VERSION@|$version|g" -e "s|@REPO@|$repo|g" -e "s|@ARCHVER@|$archver|g" packaging/release-notes.md > "$notes"
+# "What's new": this version's section of CHANGELOG.md (a pre-release like 0.1.2-rc1 uses 0.1.2's).
+base=${version%%-*}
+changes=$(awk -v v="$base" '/^## / { on = (index($0, "## " v " ") == 1 || $0 == "## " v) ; next } on' CHANGELOG.md)
+{
+  if [ -n "$changes" ]; then
+    printf "## What's new\n%s\n\n" "$changes"
+  fi
+  sed -e "s|@VERSION@|$version|g" -e "s|@REPO@|$repo|g" -e "s|@ARCHVER@|$archver|g" packaging/release-notes.md
+} > "$notes"
 cat "$out/SHA256SUMS"
