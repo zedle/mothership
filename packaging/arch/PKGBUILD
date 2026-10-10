@@ -1,0 +1,53 @@
+# Maintainer: Greg Gage <zedle@zedle.com>
+pkgbase=mothership
+pkgname=(mothership mothership-dkms)
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Lighting, thermal and firmware control for Alienware laptops (replaces Alienware Command Center)"
+arch=('any')
+url="https://github.com/zedle/mothership"
+license=('MIT' 'GPL-2.0-only')
+makedepends=('git')
+# MOTHERSHIP_GIT / MOTHERSHIP_REF build another checkout or a pinned commit (the dotfiles do).
+_ref=${MOTHERSHIP_REF:-}
+source=("$pkgbase::git+${MOTHERSHIP_GIT:-$url.git}${_ref:+#commit=$_ref}")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$pkgbase"
+  printf '%s.r%s.g%s' "$(sed -n 's/^__version__ = "\(.*\)"/\1/p' mothership/__init__.py)" \
+    "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+check() {
+  cd "$pkgbase"
+  make test
+}
+
+package_mothership() {
+  license=('MIT')
+  depends=('python')
+  optdepends=('libpulse: mute/mic-mute key indicators (pactl)'
+              'dfu-util: lighting controller firmware updates'
+              'mothership-dkms: real G-Mode and power information')
+  install=mothership.install
+  cd "$pkgbase"
+  make install PREFIX=/usr DESTDIR="$pkgdir"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
+
+package_mothership-dkms() {
+  pkgdesc="Extended alienware-wmi kernel module (real G-Mode, power information) for mothership, built by DKMS"
+  license=('GPL-2.0-only')
+  depends=('dkms')
+  unset install
+  cd "$pkgbase/kernel"
+  local dst="$pkgdir/usr/src/alienware-wmi-mothership-$pkgver"
+  install -Dm644 dkms.conf "$dst/dkms.conf"
+  sed -i "s/^PACKAGE_VERSION=.*/PACKAGE_VERSION=\"$pkgver\"/" "$dst/dkms.conf"
+  install -Dm644 Makefile "$dst/Makefile"
+  for f in alienware-wmi/*.c alienware-wmi/*.h alienware-wmi/Kbuild alienware-wmi/Makefile; do
+    [[ -e $f ]] && install -Dm644 "$f" "$dst/$f"
+  done
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "mothership",
+  "name": "Mothership",
+  "version": "0.1.0",
+  "author": "gage",
+  "description": "Alienware lighting, thermal modes, fans and the power button, through mothershipd.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Mothership.qml"
+  },
+  "barWidget": {
+    "displayName": "Mothership",
+    "description": "Keyboard and chassis lights, thermal modes, fan boost and power-button colours (mothership).",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "command": ""
+    },
+    "schema": [
+      {
+        "key": "command",
+        "type": "string",
+        "label": "Command",
+        "description": "How to run the mothership CLI. Empty: `mothership` if it's installed, else the source checkout this plugin lives in.",
+        "default": ""
+      }
+    ]
+  }
+}

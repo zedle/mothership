@@ -1,0 +1,125 @@
+{
+  "_comment": "Hardware mothership recognises. Written for this project from observation and protocol notes; zone numbers are the controllers' LED ids.",
+  "keyboards": [
+    {
+      "name": "Alienware per-key RGB keyboard (Darfon/ITE)",
+      "vid": "0d62",
+      "report_id": 204,
+      "protocol": "darfon-v5",
+      "note": "Lighting interface carries report id 0xcc; on the x17 R2 (0d62:cabc) it is also the typing interface, so it is opened write-only.",
+      "unlit": {
+        "cabc": [
+          106,
+          107
+        ],
+        "_note": "LED ids with no LED behind them on that keyboard (x17 R2 Cherry: no space bar LED)"
+      }
+    }
+  ],
+  "chassis": [
+    {
+      "name": "Alienware AW-ELC lighting controller",
+      "vid": "187c",
+      "pids": [
+        "0550",
+        "0551"
+      ],
+      "protocol": "elc-v4"
+    }
+  ],
+  "chassis_maps": {
+    "0x0306": {
+      "models": [
+        "Alienware x15 R2",
+        "Alienware x17 R2"
+      ],
+      "zones": {
+        "power": [
+          0
+        ],
+        "head": [
+          1
+        ],
+        "touchpad": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "rear_left": [
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "rear_right": [
+          15,
+          16,
+          17,
+          18,
+          19
+        ]
+      },
+      "groups": {
+        "rear": [
+          "rear_left",
+          "rear_right"
+        ],
+        "lights": [
+          "head",
+          "touchpad",
+          "rear_left",
+          "rear_right"
+        ]
+      },
+      "columns": [
+        [
+          10,
+          15
+        ],
+        [
+          11,
+          16
+        ],
+        [
+          12,
+          17
+        ],
+        [
+          13,
+          18
+        ],
+        [
+          14,
+          19
+        ],
+        [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        [
+          1
+        ]
+      ],
+      "power_states": true,
+      "optional_zones": {
+        "touchpad": "touchpad_lighting"
+      },
+      "_note": "touchpad zones exist only on lit-touchpad models; shown when the extended driver's touchpad_lighting reads 1 or the config sets chassis.touchpad true"
+    },
+    "0x0406": {
+      "same_as": "0x0306"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+[Unit]
+Description=mothership: fire on the Alienware keyboard, flaring the keys you press
+Documentation=https://github.com/zedle/mothership
+After=systemd-udevd.service systemd-tmpfiles-setup.service
+
+[Service]
+# It reads keystrokes, so it runs as a throwaway user that can reach nothing else: input
+# devices read-only, the lighting hidraw nodes (group mothership), no network, no home, a
+# read-only filesystem except /run/mothership, no capabilities. It reads keys only while
+# /run/mothership/effect says "fire", and never logs which key was pressed. It exits at
+# once on machines without the keyboard.
+ExecStart=/usr/bin/python3 -I -m mothership.fire
+WorkingDirectory=/
+DynamicUser=yes
+SupplementaryGroups=input mothership
+Restart=on-failure
+RestartSec=5
+DevicePolicy=closed
+DeviceAllow=char-input r
+DeviceAllow=char-hidraw rw
+ProtectSystem=strict
+ReadWritePaths=-/run/mothership
+ProtectHome=yes
+PrivateTmp=yes
+PrivateIPC=yes
+PrivateNetwork=yes
+IPAddressDeny=any
+RestrictAddressFamilies=none
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+KeyringMode=private
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+SystemCallErrorNumber=EPERM
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

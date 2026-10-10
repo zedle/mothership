@@ -1,0 +1,28 @@
+# mothership: Alienware lighting and thermal control for group "mothership".
+# Members: the desktop user (runs mothershipd) and the sandboxed mothership-fire service.
+# Matches nothing on machines without the hardware.
+
+# Per-key keyboard (Darfon 0d62, "API v5": 64-byte feature reports, report id 0xcc).
+# On the x17 R2 (0d62:cabc) the lighting interface is also the typing interface, so the
+# group gets WRITE-ONLY access (0620): enough to open it O_WRONLY and send the lighting
+# feature-report ioctls, never enough to read keystrokes. Never widen this to read or uaccess.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0d62", ENV{ID_USB_INTERFACE_NUM}=="00", GROUP="mothership", MODE="0620"
+
+# AW-ELC chassis lighting (187c:0550/0551, "API v4": lid alien head, rear loop, touchpad,
+# power button). Lighting only, nothing typed through it, so status replies may be read.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="187c", ATTRS{idProduct}=="055[01]", GROUP="mothership", MODE="0660"
+
+# alienware-wmi thermal control: the platform profile (thermal mode, G-Mode) and per-fan
+# boost. The firmware keeps its own thermal protection whatever is written here.
+SUBSYSTEM=="platform-profile", ATTR{name}=="alienware-wmi", RUN+="/usr/bin/chgrp mothership /sys%p/profile", RUN+="/usr/bin/chmod 0664 /sys%p/profile"
+SUBSYSTEM=="hwmon", ATTR{name}=="alienware_wmi", RUN+="/bin/sh -c 'chgrp mothership /sys%p/fan*_boost; chmod 0664 /sys%p/fan*_boost'"
+
+# G-Mode and power information from the extended alienware-wmi driver (mothership's kernel/
+# DKMS module): the gmode file on the WMAX WMI device. No-op with the stock driver.
+ACTION=="add|bind", SUBSYSTEM=="wmi", DRIVER=="alienware-wmi-wmax", RUN+="/bin/sh -c 'f=/sys%p/gmode; [ -e $$f ] && chgrp mothership $$f && chmod 0664 $$f || true'"
+
+# CPU temperature limit (Intel TCC offset, int340x processor thermal device) and the CPU
+# package power limits (intel-rapl): lowering them makes the laptop cooler and quieter; the
+# firmware enforces its own maximums.
+SUBSYSTEM=="pci", ACTION=="add|bind", DRIVER=="proc_thermal_pci", RUN+="/bin/sh -c 'f=/sys%p/tcc_offset_degree_celsius; [ -e $$f ] && chgrp mothership $$f && chmod 0664 $$f || true'"
+SUBSYSTEM=="powercap", KERNEL=="intel-rapl:0", RUN+="/bin/sh -c 'chgrp mothership /sys%p/constraint_*_power_limit_uw; chmod 0664 /sys%p/constraint_*_power_limit_uw'"

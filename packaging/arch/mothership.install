@@ -1,0 +1,22 @@
+_note() {
+  cat <<'MSG'
+==> mothership: devices are reached through the "mothership" group.
+    Add yourself and log in again:   sudo usermod -aG mothership "$USER"
+    Apply the udev rules now:        sudo udevadm trigger --subsystem-match=hidraw --subsystem-match=hwmon --subsystem-match=platform-profile
+    Start the daemon (as the user):  systemctl --user enable --now mothershipd.service
+    Fire effect with key flares:     sudo systemctl enable --now mothership-fire.service
+MSG
+}
+
+post_install() {
+  _note
+}
+
+post_upgrade() {
+  systemctl try-restart mothership-fire.service >/dev/null 2>&1 || true
+  echo "==> mothership: restart the daemon: systemctl --user restart mothershipd.service"
+}
+
+pre_remove() {
+  systemctl disable --now mothership-fire.service >/dev/null 2>&1 || true
+}

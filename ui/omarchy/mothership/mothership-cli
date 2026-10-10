@@ -1,0 +1,10 @@
+#!/bin/sh
+# Runs the mothership CLI for the Omarchy front end: the installed command when there is one,
+# else the source checkout this plugin lives in (ui/omarchy/mothership -> the repo root).
+if command -v mothership >/dev/null 2>&1; then
+  exec mothership "$@"
+fi
+here=$(dirname "$(readlink -f "$0")")
+cd "$here/../../.." 2>/dev/null && [ -d mothership ] && exec python3 -m mothership.cli "$@"
+echo "mothership: not installed (no mothership command and no source checkout next to the plugin)" >&2
+exit 127

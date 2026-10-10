@@ -1,0 +1,13 @@
+[Unit]
+Description=mothership: Alienware lighting and thermal control
+Documentation=https://github.com/zedle/mothership
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/mothership daemon
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

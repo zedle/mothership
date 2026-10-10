@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Out-of-tree build of alienware-wmi (mothership). Same object list as
+# drivers/platform/x86/dell/Makefile, so the result replaces the in-tree
+# module of the same name. Both interfaces are always built: the in-tree
+# Kconfig options may be off on the kernel this is built against.
+#
+obj-m				+= alienware-wmi.o
+alienware-wmi-y			:= alienware-wmi-base.o
+alienware-wmi-y			+= alienware-wmi-legacy.o
+alienware-wmi-y			+= alienware-wmi-wmax.o
+
+ccflags-y			+= -DCONFIG_ALIENWARE_WMI_LEGACY=1
+ccflags-y			+= -DCONFIG_ALIENWARE_WMI_WMAX=1
